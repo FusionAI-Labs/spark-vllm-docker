@@ -113,7 +113,9 @@ RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
     cd flashinfer-cubin && uv build --no-build-isolation --wheel . --out-dir=/workspace/wheels -v && \
     # flashinfer-jit-cache
     cd ../flashinfer-jit-cache && \
-    uv build --no-build-isolation --wheel . --out-dir=/workspace/wheels -v
+    uv build --no-build-isolation --wheel . --out-dir=/workspace/wheels -v && \
+    # dump git ref in the wheels dir
+    cd .. && git rev-parse HEAD > /workspace/wheels/.flashinfer-commit
 
 # =========================================================
 # STAGE 3: FlashInfer Wheel Export
@@ -196,7 +198,9 @@ RUN curl -L https://patch-diff.githubusercontent.com/raw/vllm-project/vllm/pull/
 # Final Compilation
 RUN --mount=type=cache,id=ccache,target=/root/.ccache \
     --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
-    uv build --no-build-isolation --wheel . --out-dir=/workspace/wheels -v
+    uv build --no-build-isolation --wheel . --out-dir=/workspace/wheels -v && \
+    # dump git ref in the wheels dir
+    git rev-parse HEAD > /workspace/wheels/.vllm-commit
 
 # =========================================================
 # STAGE 5: vLLM Wheel Export

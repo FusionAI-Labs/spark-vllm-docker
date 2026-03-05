@@ -138,6 +138,9 @@ for a in assets:
     for f in "$WHEELS_DIR/${PREFIX}"*.whl; do
         [ -f "$f" ] && mv "$f" "$DL_BACKUP/"
     done
+    for f in "$WHEELS_DIR/.${PREFIX}"*; do
+        [ -f "$f" ] && mv "$f" "$DL_BACKUP/"
+    done
 
     local URL NAME TMP_WHL
     local DOWNLOADED=()
@@ -154,6 +157,7 @@ for a in assets:
             if compgen -G "$DL_BACKUP/${PREFIX}*.whl" > /dev/null 2>&1; then
                 echo "Restoring previous $PREFIX wheels..."
                 mv "$DL_BACKUP/${PREFIX}"*.whl "$WHEELS_DIR/"
+                mv "$DL_BACKUP/.${PREFIX}"* "$WHEELS_DIR/"
             fi
             rm -rf "$DL_BACKUP"
             return 1
