@@ -1,0 +1,17 @@
+{
+  "model": "Qwen/Qwen3.5-27B",
+  "prompt": "Where does an AIRBUS A320 lay its eggs?",
+  "request": {
+    "max_tokens": 1024,
+    "temperature": 1.0,
+    "top_p": 0.95,
+    "presence_penalty": 1.5,
+    "stream": true
+  },
+  "extra_body": {
+    "top_k": 20,
+    "chat_template_kwargs": {
+      "enable_thinking": true
+    }
+  }
+}

@@ -83,7 +83,7 @@ detect_local_ip() {
     fi
 
     # Get CIDR of the selected ETH_IF
-    CIDR=$(ip -o -f inet addr show "$ETH_IF" | awk '{print $4}' | head -n 1)
+    CIDR=$(ip -o -f inet addr show "$ETH_IF" scope global | awk '{print $4}' | head -n 1)
     
     if [[ -z "$CIDR" ]]; then
         echo "Error: Could not determine IP/CIDR for interface $ETH_IF"
