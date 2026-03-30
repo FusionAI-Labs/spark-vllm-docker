@@ -4,9 +4,9 @@
 ARG BUILD_JOBS=16
 
 # =========================================================
-# STAGE 1: Base Image (Installs Dependencies)
+# STAGE 1: Base Build Image
 # =========================================================
-FROM nvcr.io/nvidia/pytorch:26.01-py3 AS base
+FROM nvidia/cuda:13.2.0-devel-ubuntu24.04 AS base
 
 # Build parallemism
 ARG BUILD_JOBS
@@ -35,10 +35,18 @@ ENV VLLM_BASE_DIR=/workspace/vllm
 # Added ccache to enable incremental compilation caching
 RUN apt update && \
     apt install -y --no-install-recommends \
-    curl vim ninja-build git \
+    curl vim cmake build-essential ninja-build \
+    libcudnn9-cuda-13 libcudnn9-dev-cuda-13 \
+    python3-dev python3-pip git wget \
+    libnccl-dev libnccl2 libibverbs1 libibverbs-dev rdma-core \
     ccache \
     && rm -rf /var/lib/apt/lists/* \
-    && pip install uv && pip uninstall -y flash-attn
+    && pip install uv
+
+# Additional deps
+RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
+     uv pip install torch torchvision torchaudio triton --index-url https://download.pytorch.org/whl/nightly/cu130 && \
+     uv pip install nvidia-nvshmem-cu13 "apache-tvm-ffi<0.2" filelock pynvml requests tqdm
 
 # Configure Ccache for CUDA/C++
 ENV PATH=/usr/lib/ccache:$PATH
@@ -72,9 +80,6 @@ ARG FLASHINFER_REF=main
 # --- CACHE BUSTER ---
 # Change this argument to force a re-download of FlashInfer
 ARG CACHEBUST_FLASHINFER=1
-
-RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
-     uv pip install nvidia-nvshmem-cu13 "apache-tvm-ffi<0.2"
 
 # Smart Git Clone (Fetch changes instead of full re-clone)
 RUN --mount=type=cache,id=repo-cache,target=/repo-cache \
@@ -131,9 +136,6 @@ FROM base AS vllm-builder
 ARG TORCH_CUDA_ARCH_LIST="12.1a"
 ENV TORCH_CUDA_ARCH_LIST=${TORCH_CUDA_ARCH_LIST}
 WORKDIR $VLLM_BASE_DIR
-
-RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
-     uv pip install nvidia-nvshmem-cu13 "apache-tvm-ffi<0.2"
 
 # --- VLLM SOURCE CACHE BUSTER ---
 ARG CACHEBUST_VLLM=1
@@ -194,6 +196,15 @@ RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
 # TEMPORARY PATCH for broken vLLM build (unguarded Hopper code) - reverting PR #34758 and #34302
 RUN curl -L https://patch-diff.githubusercontent.com/raw/vllm-project/vllm/pull/34758.diff | patch -p1 -R || echo "Cannot revert PR #34758, skipping"
 RUN curl -L https://patch-diff.githubusercontent.com/raw/vllm-project/vllm/pull/34302.diff | patch -p1 -R || echo "Cannot revert PR #34302, skipping"
+# TEMPORARY PATCH for broken NVFP4 quants
+RUN curl -fsL https://patch-diff.githubusercontent.com/raw/vllm-project/vllm/pull/38126.diff -o pr38126.diff \
+    && if git apply --reverse --check pr38126.diff 2>/dev/null; then \
+         echo "Patch already applied, skipping."; \
+       else \
+         echo "Applying patch..."; \
+         git apply -v pr38126.diff; \
+       fi \
+    && rm pr38126.diff
 
 # Final Compilation
 RUN --mount=type=cache,id=ccache,target=/root/.ccache \
@@ -211,7 +222,7 @@ COPY --from=vllm-builder /workspace/wheels /
 # =========================================================
 # STAGE 6: Runner (Installs wheels from host ./wheels/)
 # =========================================================
-FROM nvcr.io/nvidia/pytorch:26.01-py3 AS runner
+FROM nvidia/cuda:13.2.0-devel-ubuntu24.04 AS runner
 
 # Transferring build settings from build image because of ptxas/jit compilation during vLLM startup
 # Build parallemism
@@ -235,10 +246,12 @@ ENV UV_LINK_MODE=copy
 # Install runtime dependencies
 RUN apt update && \
     apt install -y --no-install-recommends \
-    curl vim git \
+    python3 python3-pip python3-dev vim curl git wget \
+    libcudnn9-cuda-13 \
+    libnccl-dev libnccl2 libibverbs1 libibverbs-dev rdma-core \
     libxcb1 \
     && rm -rf /var/lib/apt/lists/* \
-    && pip install uv && pip uninstall -y flash-attn # triton-kernels pytorch-triton
+    && pip install uv
 
 # Set final working directory
 WORKDIR $VLLM_BASE_DIR
@@ -249,6 +262,11 @@ RUN mkdir -p tiktoken_encodings && \
     wget -O tiktoken_encodings/cl100k_base.tiktoken "https://openaipublic.blob.core.windows.net/encodings/cl100k_base.tiktoken"
 
 ARG PRE_TRANSFORMERS=0
+
+# Install deps
+RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
+     uv pip install torch torchvision torchaudio triton --index-url https://download.pytorch.org/whl/nightly/cu130 && \
+     uv pip install nvidia-nvshmem-cu13 "apache-tvm-ffi<0.2"
 
 # Install wheels from host ./wheels/ (bind-mounted from build context — no layer bloat)
 # With --tf5: override vLLM's transformers<5 constraint to get transformers>=5
@@ -270,27 +288,10 @@ ENV TRITON_PTXAS_PATH=/usr/local/cuda/bin/ptxas
 ENV TIKTOKEN_ENCODINGS_BASE=$VLLM_BASE_DIR/tiktoken_encodings
 ENV PATH=$VLLM_BASE_DIR:$PATH
 
-# Copy scripts
-COPY run-cluster-node.sh $VLLM_BASE_DIR/
-RUN chmod +x $VLLM_BASE_DIR/run-cluster-node.sh
 
 # Final extra deps
 RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
-    uv pip install ray[default] fastsafetensors nvidia-nvshmem-cu13
+    uv pip install ray[default] fastsafetensors
 
-# Cleanup
-
-# Keeping it here for reference - this won't work as is without squashing layers
-# RUN uv pip uninstall absl-py apex argon2-cffi \
-#     argon2-cffi-bindings arrow asttokens astunparse async-lru audioread babel beautifulsoup4 \
-#     black bleach comm contourpy cycler datasets debugpy decorator defusedxml dllist dm-tree \
-#     execnet executing expecttest fastjsonschema fonttools fqdn gast hypothesis \
-#     ipykernel ipython ipython_pygments_lexers isoduration isort jedi joblib jupyter-events \
-#     jupyter-lsp jupyter_client jupyter_core jupyter_server jupyter_server_terminals jupyterlab \
-#     jupyterlab_code_formatter jupyterlab_code_formatter jupyterlab_pygments jupyterlab_server \
-#     jupyterlab_tensorboard_pro jupytext kiwisolver matplotlib matplotlib-inline matplotlib-inline \
-#     mistune ml_dtypes mock nbclient nbconvert nbformat nest-asyncio notebook notebook_shim \
-#     opt_einsum optree outlines_core overrides pandas pandocfilters parso pexpect polygraphy pooch \
-#     pyarrow pycocotools pytest-flakefinder pytest-rerunfailures pytest-shard pytest-xdist \
-#     scikit-learn scipy Send2Trash soundfile soupsieve soxr spin stack-data \
-#     wcwidth webcolors xdoctest Werkzeug
+# Build metadata (generated by build-and-copy.sh)
+COPY build-metadata.yaml /workspace/build-metadata.yaml
