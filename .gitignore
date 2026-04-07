@@ -3,3 +3,5 @@ build-metadata.yaml
 
 python/.*
 python/__*
+
+wheels/*
