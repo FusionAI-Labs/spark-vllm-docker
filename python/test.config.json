@@ -1,5 +1,5 @@
 {
-  "model": "nvidia/Gemma-4-31B-IT-NVFP4",
+  "model": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4",
   "prompt": "Where does an AIRBUS A320 lay its eggs?",
   "request": {
     "max_tokens": 1024,
@@ -11,7 +11,7 @@
   "extra_body": {
     "top_k": 20,
     "chat_template_kwargs": {
-      "enable_thinking": true
+      "enable_thinking": false
     }
   }
 }

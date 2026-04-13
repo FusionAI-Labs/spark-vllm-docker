@@ -12,7 +12,7 @@ import os
 
 
 os.environ["OPENAI_API_KEY"] = "1234"
-os.environ["OPENAI_BASE_URL"] = "http://localhost:8008/v1"
+os.environ["OPENAI_BASE_URL"] = "http://localhost:8888/v1"
 
 
 def load_config(config_path: Path) -> dict:

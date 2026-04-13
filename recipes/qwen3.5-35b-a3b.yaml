@@ -9,10 +9,11 @@ description: vLLM serving Qwen3.5-35B-A3B
 # HuggingFace model to download (optional, for --download-model)
 model: Qwen/Qwen3.5-35B-A3B
 
-#solo_only: true
-
 # Container image to use
-container: vllm-node
+container: vllm-node-tf5
+
+build_args:
+  - --tf5
 
 # Mod required to fix slowness and crash in the cluster (tracking https://github.com/vllm-project/vllm/issues/33857)
 mods:
@@ -21,7 +22,7 @@ mods:
 
 # Default settings (can be overridden via CLI)
 defaults:
-  port: 8008
+  port: 8888
   host: 0.0.0.0
   tensor_parallel: 2
   gpu_memory_utilization: 0.5
