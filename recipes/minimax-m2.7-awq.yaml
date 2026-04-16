@@ -1,0 +1,66 @@
+# Recipe: MiniMax-M2.7-AWQ
+# MiniMax-M2.7 model with AWQ 4-bit quantization
+
+recipe_version: "1"
+name: MiniMax-M2.7-AWQ
+description: vLLM serving MiniMax-M2.7-AWQ with Ray distributed backend
+
+# HuggingFace model to download (optional, for --download-model)
+model: cyankiwi/MiniMax-M2.7-AWQ-4bit
+
+# Only cluster is supported
+cluster_only: false
+solo_only: false
+
+# Container image to use
+container: vllm-node-tf5
+
+build_args:
+  - --tf5
+
+# No mods required
+mods: []
+
+# Default settings (can be overridden via CLI)
+defaults:
+  port: 8888
+  host: 0.0.0.0
+  tensor_parallel: 2
+  gpu_memory_utilization: 0.85
+  max_model_len: 196608
+  max_num_seqs: 4
+  max_num_batched_tokens: 8192
+
+# Environment variables
+env:
+  VLLM_USE_FLASHINFER_MOE_FP16: 1
+  VLLM_USE_DEEP_GEMM: 0
+  VLLM_USE_FLASHINFER_SAMPLER: 0
+  VLLM_ALLOW_LONG_MAX_MODEL_LEN: 1
+  VLLM_FLOAT32_MATMUL_PRECISION: high
+  VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS: 1
+  OMP_NUM_THREADS: 8
+
+# The vLLM serve command template
+command: |
+  vllm serve cyankiwi/MiniMax-M2.7-AWQ-4bit \
+    --host {host} \
+    --port {port} \
+    --max-model-len {max_model_len} \
+    --gpu-memory-utilization {gpu_memory_utilization} \
+    --max-num-seqs {max_num_seqs} \
+    --max-num-batched-tokens {max_num_batched_tokens} \
+    --enable-prefix-caching \
+    --enable-chunked-prefill \
+    --enable-auto-tool-choice \
+    --served-model-name MiniMax-M2.7 \
+    --tool-call-parser minimax_m2 \
+    --reasoning-parser minimax_m2 \
+    --attention-backend flashinfer \
+    --dtype auto \
+    --kv-cache-dtype fp8 \
+    --disable-custom-all-reduce \
+    --trust-remote-code \
+    --tensor-parallel-size {tensor_parallel} \
+    --load-format fastsafetensors \
+    --distributed-executor-backend ray
