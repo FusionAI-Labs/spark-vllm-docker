@@ -23,17 +23,23 @@ defaults:
   port: 8888
   host: 0.0.0.0
   tensor_parallel: 2
-  gpu_memory_utilization: 0.3
+  gpu_memory_utilization: 0.33333
   max_model_len: 32768 
+
+env:
+   VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS: 1
 
 # The vLLM serve command template
 command: |
   vllm serve "fdtn-ai/Foundation-Sec-8B-Reasoning" \
-    --host 0.0.0.0 \
+    --host {host} \
     --port {port} \
+    --load-format fastsafetensors \
+    --enable-prefix-caching \
     --tensor-parallel-size {tensor_parallel} \
     --max-model-len {max_model_len} \
     --gpu-memory-utilization {gpu_memory_utilization} \
     --trust-remote-code \
     --reasoning-parser minimax_m2 \
+    --attention-backend flashinfer \
     -tp {tensor_parallel} --distributed-executor-backend ray
