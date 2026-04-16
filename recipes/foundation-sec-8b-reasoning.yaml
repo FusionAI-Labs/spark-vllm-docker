@@ -22,7 +22,7 @@ mods: []
 defaults:
   port: 8888
   host: 0.0.0.0
-  tensor_parallel: 1
+  tensor_parallel: 2
   gpu_memory_utilization: 0.3
   max_model_len: 32768 
 
@@ -35,4 +35,5 @@ command: |
     --max-model-len {max_model_len} \
     --gpu-memory-utilization {gpu_memory_utilization} \
     --trust-remote-code \
-    --reasoning-parser minimax_m2
+    --reasoning-parser minimax_m2 \
+    -tp {tensor_parallel} --distributed-executor-backend ray
