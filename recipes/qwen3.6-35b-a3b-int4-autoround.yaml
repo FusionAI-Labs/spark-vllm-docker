@@ -1,0 +1,51 @@
+# Recipe: Intel/Qwen3.6-35B-A3B-int4-AutoRound
+# Intel/Qwen3.6-35B-A3B-int4-AutoRound model in native FP4 format
+
+recipe_version: "1"
+name: Qwen3.6-35B-A3B-int4-AutoRound
+description: vLLM serving Qwen3.6-35B-A3B-int4-AutoRound
+
+# HuggingFace model to download (optional, for --download-model)
+model: Intel/Qwen3.6-35B-A3B-int4-AutoRound
+
+solo_only: true
+
+# Container image to use
+container: vllm-node-tf5
+
+build_args:
+  - --tf5
+
+# Mod 
+mods: []
+
+# Default settings (can be overridden via CLI)
+defaults:
+  port: 8888
+  host: 0.0.0.0
+  gpu_memory_utilization: 0.3
+  max_model_len: 262144
+  max_num_batched_tokens: 32768
+
+# Environment variables
+env:
+  VLLM_MARLIN_USE_ATOMIC_ADD: 1
+
+# The vLLM serve command template
+command: |
+ vllm serve Intel/Qwen3.6-35B-A3B-int4-AutoRound \
+    --host {host} \
+    --port {port} \
+    --max-model-len {max_model_len} \
+    --max-num-batched-tokens {max_num_batched_tokens} \
+    --gpu-memory-utilization {gpu_memory_utilization} \
+    --trust-remote-code \
+    --enable-auto-tool-choice \
+    --tool-call-parser qwen3_xml \
+    --reasoning-parser qwen3 \
+    --kv-cache-dtype fp8 \
+    --enable-chunked-prefill \
+    --default-chat-template-kwargs '{{"preserve_thinking": true}}' \
+    --load-format fastsafetensors \
+    --attention-backend flashinfer \
+    --enable-prefix-caching
