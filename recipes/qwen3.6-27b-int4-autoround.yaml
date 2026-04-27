@@ -1,0 +1,53 @@
+# Recipe: Intel/Qwen3.6-27B-int4-AutoRound
+# Intel/Qwen3.6-27B-int4-AutoRound model in native FP4 format
+
+recipe_version: "1"
+name: Qwen3.6-27B-int4-AutoRound
+description: vLLM serving Qwen3.6-27B-int4-AutoRound
+
+# HuggingFace model to download (optional, for --download-model)
+model: Intel/Qwen3.6-27B-int4-AutoRound
+
+solo_only: true
+
+# Container image to use
+container: vllm-node-tf5
+
+build_args:
+  - --tf5
+
+# Mod 
+mods: []
+
+# Default settings (can be overridden via CLI)
+defaults:
+  port: 8888
+  host: 0.0.0.0
+  gpu_memory_utilization: 0.5
+  max_model_len: 262144
+  max_num_batched_tokens: 16384
+
+# Environment variables
+env:
+  VLLM_MARLIN_USE_ATOMIC_ADD: 1
+
+# The vLLM serve command template
+command: |
+ vllm serve Intel/Qwen3.6-27B-int4-AutoRound \
+    --host {host} \
+    --port {port} \
+    --max-model-len {max_model_len} \
+    --max-num-batched-tokens {max_num_batched_tokens} \
+    --gpu-memory-utilization {gpu_memory_utilization} \
+    --enable-prefix-caching \
+    --load-format fastsafetensors \
+    --enable-chunked-prefill \
+    --enable-auto-tool-choice \
+    --tool-call-parser qwen3_coder \
+    --reasoning-parser qwen3 \
+    --attention-backend flashinfer \
+    --trust-remote-code \
+    --default-chat-template-kwargs '{{"preserve_thinking": true}}' \
+    --speculative-config '{{"method": "qwen3_next_mtp", "num_speculative_tokens": 3}}' \
+    --generation-config auto \
+    --override-generation-config '{{"temperature": 0.6, "top_p": 0.95, "top_k": 20, "min_p": 0.0, "presence_penalty": 0.0, "repetition_penalty": 1.0}}'
